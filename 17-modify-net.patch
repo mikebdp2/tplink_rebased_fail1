@@ -40,8 +40,8 @@ index 16a6dcbd8c..39edba0d30 100644
 --- a/net/eth.c
 +++ b/net/eth.c
 @@ -287,6 +287,17 @@ int eth_initialize(bd_t *bis)
- #if defined(CONFIG_AT91CAP9)
- 	at91cap9_eth_initialize(bis);
+ #if defined(CONFIG_AT91CAP9) || defined(CONFIG_AT91SAM9260)
+ 	at91sam9_eth_initialize(bis);
  #endif
 +/* cu570m start */
 +#if defined(CONFIG_AR7100)

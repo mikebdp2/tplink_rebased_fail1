@@ -244,7 +244,7 @@ index b505a42550..1c472594d5 100644
  # MA 02111-1307 USA
  #
 +# MIPSFLAGS -> #MIPSFLAGS - cu570m
- v=$(shell $(AS) --version |grep "GNU assembler" |cut -d. -f2)
+ v=$(shell $(AS) --version | grep 'GNU assembler' | egrep -o '2\.[0-9\.]+' | cut -d. -f2)
 -MIPSFLAGS:=$(shell \
 +#MIPSFLAGS:=$(shell \
  if [ "$v" -lt "14" ]; then \

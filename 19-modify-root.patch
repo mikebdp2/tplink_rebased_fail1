@@ -85,7 +85,7 @@ index 4796f45fc6..c6885e1a34 100644
  ifeq ($(CPU),i386)
  OBJS += cpu/$(CPU)/start16.o
  OBJS += cpu/$(CPU)/reset.o
-@@ -191,72 +210,90 @@ endif
+@@ -191,66 +210,84 @@ endif
  
  OBJS := $(addprefix $(obj),$(OBJS))
  
@@ -95,7 +95,6 @@ index 4796f45fc6..c6885e1a34 100644
 -	"board/$(VENDOR)/common/lib$(VENDOR).a"; fi)
 +# LIBS += $(shell if [ -f board/$(VENDOR)/common/Makefile ]; then echo \
 +# 	"board/$(VENDOR)/common/lib$(VENDOR).a"; fi)
- LIBS += board/$(BOARDDIR)/lib$(BOARD).a
  LIBS += cpu/$(CPU)/lib$(CPU).a
  ifdef SOC
  LIBS += cpu/$(CPU)/$(SOC)/lib$(SOC).a
@@ -161,37 +160,24 @@ index 4796f45fc6..c6885e1a34 100644
 -LIBS += drivers/serial/libserial.a
 -LIBS += drivers/usb/libusb.a
 -LIBS += drivers/video/libvideo.a
--LIBS += post/libpost.a post/drivers/libpostdrivers.a
--LIBS += $(shell if [ -d post/lib_$(ARCH) ]; then echo \
--	"post/lib_$(ARCH)/libpost$(ARCH).a"; fi)
--LIBS += $(shell if [ -d post/lib_$(ARCH)/fpu ]; then echo \
--	"post/lib_$(ARCH)/fpu/libpost$(ARCH)fpu.a"; fi)
--LIBS += $(shell if [ -d post/cpu/$(CPU) ]; then echo \
--	"post/cpu/$(CPU)/libpost$(CPU).a"; fi)
--LIBS += $(shell if [ -d post/board/$(BOARDDIR) ]; then echo \
--	"post/board/$(BOARDDIR)/libpost$(BOARD).a"; fi)
 +# LIBS += drivers/serial/libserial.a
 +# LIBS += drivers/usb/libusb.a
 +# LIBS += drivers/video/libvideo.a
-+# LIBS += post/libpost.a post/drivers/libpostdrivers.a
-+# LIBS += $(shell if [ -d post/lib_$(ARCH) ]; then echo \
-+# 	"post/lib_$(ARCH)/libpost$(ARCH).a"; fi)
-+# LIBS += $(shell if [ -d post/lib_$(ARCH)/fpu ]; then echo \
-+# 	"post/lib_$(ARCH)/fpu/libpost$(ARCH)fpu.a"; fi)
-+# LIBS += $(shell if [ -d post/cpu/$(CPU) ]; then echo \
-+# 	"post/cpu/$(CPU)/libpost$(CPU).a"; fi)
-+# LIBS += $(shell if [ -d post/board/$(BOARDDIR) ]; then echo \
-+# 	"post/board/$(BOARDDIR)/libpost$(BOARD).a"; fi)
  LIBS += common/libcommon.a
 -LIBS += libfdt/libfdt.a
 -LIBS += api/libapi.a
+-LIBS += post/libpost.a
 +# LIBS += libfdt/libfdt.a
 +# LIBS += api/libapi.a
++# LIBS += post/libpost.a
 +LIBS += $(BOARDLIBS)
 +# LIBS - cu570m end
  
  LIBS := $(addprefix $(obj),$(LIBS))
  .PHONY : $(LIBS) $(VERSION_FILE)
+ 
+ LIBBOARD = board/$(BOARDDIR)/lib$(BOARD).a
+ LIBBOARD := $(addprefix $(obj),$(LIBBOARD))
  
 +# cu570m start
 +ifeq ($(COMPRESSED_UBOOT),1)
@@ -234,13 +220,14 @@ index 4796f45fc6..c6885e1a34 100644
  
  $(obj)u-boot.hex:	$(obj)u-boot
  		$(OBJCOPY) ${OBJCFLAGS} -O ihex $< $@
-@@ -314,9 +355,10 @@ $(obj)u-boot.sha1:	$(obj)u-boot.bin
+@@ -314,10 +355,11 @@ $(obj)u-boot.sha1:	$(obj)u-boot.bin
  $(obj)u-boot.dis:	$(obj)u-boot
  		$(OBJDUMP) -d $< > $@
  
 +# $(BOARD_EXTRA_OBJS) - cu570m
- $(obj)u-boot:		depend $(SUBDIRS) $(OBJS) $(LIBS) $(LDSCRIPT)
- 		UNDEF_SYM=`$(OBJDUMP) -x $(LIBS) |sed  -n -e 's/.*\($(SYM_PREFIX)__u_boot_cmd_.*\)/-u\1/p'|sort|uniq`;\
+ $(obj)u-boot:		depend $(SUBDIRS) $(OBJS) $(LIBBOARD) $(LIBS) $(LDSCRIPT)
+ 		UNDEF_SYM=`$(OBJDUMP) -x $(LIBBOARD) $(LIBS) | \
+ 		sed  -n -e 's/.*\($(SYM_PREFIX)__u_boot_cmd_.*\)/-u\1/p'|sort|uniq`;\
 -		cd $(LNDIR) && $(LD) $(LDFLAGS) $$UNDEF_SYM $(__OBJS) \
 +		cd $(LNDIR) && $(LD) $(LDFLAGS) $$UNDEF_SYM $(__OBJS) $(BOARD_EXTRA_OBJS) \
  			--start-group $(__LIBS) --end-group $(PLATFORM_LIBS) \
@@ -283,8 +270,8 @@ index 4796f45fc6..c6885e1a34 100644
 +# cu570m end
 +
  $(VERSION_FILE):
- 		@( echo -n "#define U_BOOT_VERSION \"U-Boot " ; \
- 		echo -n "$(U_BOOT_VERSION)" ; \
+ 		@( printf '#define U_BOOT_VERSION "U-Boot %s%s"\n' "$(U_BOOT_VERSION)" \
+ 		 '$(shell $(CONFIG_SHELL) $(TOPDIR)/tools/setlocalversion $(TOPDIR))' \
 @@ -2691,6 +2765,1459 @@ qemu_mips_config: unconfig
  purple_config :		unconfig
  	@$(MKCONFIG) $(@:_config=) mips mips purple
@@ -1792,9 +1779,9 @@ index 22d3398ca4..8ed731e6db 100644
 +# cu570m
 +.depend : CC = $(CROSS_COMPILE)gcc
 +
- ifneq (,$(findstring s,$(MAKEFLAGS)))
- ARFLAGS = cr
- else
+ #########################################################################
+ 
+ # Load generated board configuration
 @@ -134,7 +140,9 @@ ARFLAGS = crv
  endif
  RELFLAGS= $(PLATFORM_RELFLAGS)

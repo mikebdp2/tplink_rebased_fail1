@@ -12,7 +12,7 @@ diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
 index fe45839466..70224dfbfb 100644
 --- a/drivers/pci/Makefile
 +++ b/drivers/pci/Makefile
-@@ -25,12 +25,16 @@ include $(TOPDIR)/config.mk
+@@ -25,15 +25,19 @@ include $(TOPDIR)/config.mk
  
  LIB 	:= $(obj)libpci.a
  
@@ -25,6 +25,9 @@ index fe45839466..70224dfbfb 100644
  COBJS-y += pci_indirect.o
  COBJS-y += tsi108_pci.o
  COBJS-y += w83c553f.o
+ COBJS-$(CONFIG_SH4_PCI) += pci_sh4.o
+ COBJS-$(CONFIG_SH7751_PCI) +=pci_sh7751.o
+ COBJS-$(CONFIG_SH7780_PCI) +=pci_sh7780.o
 +endif # cu570m
  
  COBJS	:= $(COBJS-y)

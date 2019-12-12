@@ -112,20 +112,15 @@ diff --git a/common/cmd_boot.c b/common/cmd_boot.c
 index e68f16f9da..d843c6df22 100644
 --- a/common/cmd_boot.c
 +++ b/common/cmd_boot.c
-@@ -28,10 +28,12 @@
+@@ -28,6 +28,8 @@
  #include <command.h>
  #include <net.h>
  
--#if defined(CONFIG_I386)
-+#if defined(CONFIG_I386) || defined(CONFIG_MIPS) /* || defined(CONFIG_MIPS) - cu570m */
- DECLARE_GLOBAL_DATA_PTR;
- #endif
- 
 +#if (defined(TPWD_FOR_LINUX_CAL) || !defined(COMPRESSED_UBOOT)) /*  by huangwenzhong, 10May13 */ /* cu570m */
 +
- int do_go (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- {
- 	ulong	addr, rc;
+ /* Allow ports to override the default behavior */
+ __attribute__((weak))
+ unsigned long do_go_exec (ulong (*entry)(int, char *[]), int argc, char *argv[])
 @@ -42,6 +44,14 @@ int do_go (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
  		return 1;
  	}
@@ -142,21 +137,21 @@ index e68f16f9da..d843c6df22 100644
  
  	printf ("## Starting application at 0x%08lX ...\n", addr);
 @@ -58,7 +68,14 @@ int do_go (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 	argv[0] = (char *)gd;
- #endif
- #if !defined(CONFIG_NIOS)
--	rc = ((ulong (*)(int, char *[]))addr) (--argc, &argv[1]);
+ 	 * pass address parameter as argv[0] (aka command name),
+ 	 * and all remaining args
+ 	 */
+-	rc = do_go_exec ((void *)addr, argc - 1, argv + 1);
 +	/* cu570m condition branch */
 +	if (argc > 2 && argv[2][0] == 'b') {
 +		printf ("## Board info at 0x%08lX ...\n", gd->bd);
 +		rc = ((ulong (*)(int, int, int, int))addr)(gd->bd, 0, 0, 0);
 +	} else {
 +		/* old default path */
-+		rc = ((ulong (*)(int, char *[]))addr) (--argc, &argv[1]);
++		rc = do_go_exec ((void *)addr, argc - 1, argv + 1);
 +	}
- #else
- 	/*
- 	 * Nios function pointers are address >> 1
+ 	if (rc != 0) rcode = 1;
+ 
+ 	printf ("## Application terminated, rc = 0x%lX\n", rc);
 @@ -80,6 +97,8 @@ U_BOOT_CMD(
  	"      passing 'arg' as arguments\n"
  );
@@ -426,26 +421,26 @@ index 2eb7453156..7bfff45012 100644
  
  	puts ("## vxWorks terminated\n");
 diff --git a/common/cmd_flash.c b/common/cmd_flash.c
-index f56443e25e..22c34b547b 100644
+index cb1c5bb..d5bb37f 100644
 --- a/common/cmd_flash.c
 +++ b/common/cmd_flash.c
-@@ -276,6 +276,7 @@ flash_fill_sect_ranges (ulong addr_first, ulong addr_last,
- 	return rcode;
+@@ -278,6 +278,7 @@ flash_fill_sect_ranges (ulong addr_first, ulong addr_last,
  }
+ #endif /* CFG_NO_FLASH */
  
 +#ifndef COMPRESSED_UBOOT /* cu570m */
  int do_flinfo ( cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
  {
- 	ulong bank;
-@@ -303,6 +304,7 @@ int do_flinfo ( cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 	flash_print_info (&flash_info[bank-1]);
+ #ifndef CFG_NO_FLASH
+@@ -305,6 +306,7 @@ int do_flinfo ( cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+ #endif /* CFG_NO_FLASH */
  	return 0;
  }
 +#endif /* #ifndef COMPRESSED_UBOOT */ /* cu570m */
  
  int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
  {
-@@ -323,7 +325,9 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+@@ -325,7 +327,9 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
  
  	if (strcmp(argv[1], "all") == 0) {
  		for (bank=1; bank<=CFG_MAX_FLASH_BANKS; ++bank) {
@@ -455,7 +450,7 @@ index f56443e25e..22c34b547b 100644
  			info = &flash_info[bank-1];
  			rcode = flash_erase (info, 0, info->sector_count-1);
  		}
-@@ -335,8 +339,10 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+@@ -337,8 +341,10 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
  			puts ("Bad sector specification\n");
  			return 1;
  		}
@@ -466,7 +461,7 @@ index f56443e25e..22c34b547b 100644
  		rcode = flash_erase(info, sect_first, sect_last);
  		return rcode;
  	}
-@@ -351,12 +357,12 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+@@ -353,12 +359,12 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
  				info = &flash_info[bank];
  				addr_first = part->offset + info->start[0];
  				addr_last = addr_first + part->size - 1;
@@ -481,7 +476,7 @@ index f56443e25e..22c34b547b 100644
  				rcode = flash_sect_erase(addr_first, addr_last);
  				return rcode;
  			}
-@@ -379,7 +385,9 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+@@ -381,7 +387,9 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
  				CFG_MAX_FLASH_BANKS);
  			return 1;
  		}
@@ -491,7 +486,7 @@ index f56443e25e..22c34b547b 100644
  		info = &flash_info[bank-1];
  		rcode = flash_erase (info, 0, info->sector_count-1);
  		return rcode;
-@@ -421,6 +429,7 @@ int flash_sect_erase (ulong addr_first, ulong addr_last)
+@@ -423,6 +431,7 @@ int flash_sect_erase (ulong addr_first, ulong addr_last)
  		     ++bank, ++info) {
  			if (s_first[bank]>=0) {
  				erased += s_last[bank] - s_first[bank] + 1;
@@ -499,7 +494,7 @@ index f56443e25e..22c34b547b 100644
  				debug ("Erase Flash from 0x%08lx to 0x%08lx "
  					"in Bank # %ld ",
  					info->start[s_first[bank]],
-@@ -428,6 +437,9 @@ int flash_sect_erase (ulong addr_first, ulong addr_last)
+@@ -430,6 +439,9 @@ int flash_sect_erase (ulong addr_first, ulong addr_last)
  						info->start[0] + info->size - 1:
  						info->start[s_last[bank]+1] - 1,
  					bank+1);
@@ -509,24 +504,24 @@ index f56443e25e..22c34b547b 100644
  				rcode = flash_erase (info, s_first[bank], s_last[bank]);
  			}
  		}
-@@ -440,6 +452,7 @@ int flash_sect_erase (ulong addr_first, ulong addr_last)
- 	return rcode;
+@@ -442,6 +454,7 @@ int flash_sect_erase (ulong addr_first, ulong addr_last)
  }
+ #endif /* CFG_NO_FLASH */
  
 +#ifndef COMPRESSED_UBOOT /* cu570m */
  int do_protect (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
  {
- 	flash_info_t *info;
-@@ -667,7 +680,7 @@ int flash_sect_protect (int p, ulong addr_first, ulong addr_last)
- 	}
+ #ifndef CFG_NO_FLASH
+@@ -669,7 +682,7 @@ int flash_sect_protect (int p, ulong addr_first, ulong addr_last)
  	return rcode;
  }
+ #endif /* CFG_NO_FLASH */
 -
 +#endif /* #ifndef COMPRESSED_UBOOT */ /* cu570m */
  
  /**************************************************/
  #if defined(CONFIG_CMD_JFFS2) && defined(CONFIG_JFFS2_CMDLINE)
-@@ -680,12 +693,14 @@ int flash_sect_protect (int p, ulong addr_first, ulong addr_last)
+@@ -682,12 +695,14 @@ int flash_sect_protect (int p, ulong addr_first, ulong addr_last)
  # define TMP_PROT_OFF	/* empty */
  #endif
  
@@ -541,7 +536,7 @@ index f56443e25e..22c34b547b 100644
  
  U_BOOT_CMD(
  	erase,   3,   0,  do_flerase,
-@@ -701,6 +716,7 @@ U_BOOT_CMD(
+@@ -703,6 +718,7 @@ U_BOOT_CMD(
  	"erase all\n    - erase all FLASH banks\n"
  );
  
@@ -549,7 +544,7 @@ index f56443e25e..22c34b547b 100644
  U_BOOT_CMD(
  	protect,  4,  0,   do_protect,
  	"protect - enable or disable FLASH write protection\n",
-@@ -725,6 +741,7 @@ U_BOOT_CMD(
+@@ -727,6 +743,7 @@ U_BOOT_CMD(
  	TMP_PROT_OFF
  	"protect off all\n    - make all FLASH banks writable\n"
  );
@@ -1184,7 +1179,7 @@ index 67e594df69..396c8b20cf 100644
  };
  
 diff --git a/common/main.c b/common/main.c
-index 21e7afab61..647165c3de 100644
+index cc4b50f..b13bf54 100644
 --- a/common/main.c
 +++ b/common/main.c
 @@ -38,12 +38,24 @@
@@ -1199,7 +1194,7 @@ index 21e7afab61..647165c3de 100644
 +
  #include <post.h>
  
- #if defined(CONFIG_SILENT_CONSOLE) || defined(CONFIG_POST)
+ #if defined(CONFIG_SILENT_CONSOLE) || defined(CONFIG_POST) || defined(CONFIG_CMDLINE_EDITING)
  DECLARE_GLOBAL_DATA_PTR;
  #endif
  
@@ -1212,7 +1207,7 @@ index 21e7afab61..647165c3de 100644
  /*
   * Board-specific Platform code can reimplement show_boot_progress () if needed
   */
-@@ -269,6 +281,18 @@ static __inline__ int abortboot(int bootdelay)
+@@ -292,6 +304,18 @@ static __inline__ int abortboot(int bootdelay)
  
  /****************************************************************************/
  
@@ -1231,7 +1226,7 @@ index 21e7afab61..647165c3de 100644
  void main_loop (void)
  {
  #ifndef CFG_HUSH_PARSER
-@@ -363,7 +387,7 @@ void main_loop (void)
+@@ -386,7 +410,7 @@ void main_loop (void)
  	s = getenv ("bootdelay");
  	bootdelay = s ? (int)simple_strtol(s, NULL, 10) : CONFIG_BOOTDELAY;
  
@@ -1240,7 +1235,7 @@ index 21e7afab61..647165c3de 100644
  
  # ifdef CONFIG_BOOT_RETRY_TIME
  	init_cmd_timeout ();
-@@ -385,7 +409,183 @@ void main_loop (void)
+@@ -402,7 +426,183 @@ void main_loop (void)
  #endif /* CONFIG_BOOTCOUNT_LIMIT */
  		s = getenv ("bootcmd");
  
