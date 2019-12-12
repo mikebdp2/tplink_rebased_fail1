@@ -73,9 +73,9 @@ index 56176ca2af..c8f3a959fb 100644
  COBJS-y += ACEX1K.o
  COBJS-y += altera.o
 @@ -137,6 +180,21 @@ COBJS-y += crc16.o
- COBJS-y += xyzModem.o
  COBJS-y += cmd_mac.o
  COBJS-$(CONFIG_CMD_MFSL) += cmd_mfsl.o
+ COBJS-$(CONFIG_MP) += cmd_mp.o
 +endif # cu570m
 +
 +# cu570m start
@@ -176,31 +176,31 @@ index 5a8572602c..2f6edbffc9 100644
  #include <bzlib.h>
 +#include <LzmaWrapper.h> /* cu570m */
  #include <environment.h>
+ #include <lmb.h>
  #include <asm/byteorder.h>
- 
-@@ -148,6 +149,15 @@ image_header_t header;
- 
- ulong load_addr = CFG_LOAD_ADDR;		/* Default Load Address */
+@@ -148,7 +149,15 @@ image_header_t header;
+ }
+ void board_lmb_reserve(struct lmb *lmb) __attribute__((weak, alias("__board_lmb_reserve")));
  
 +/* cu570m start */
 +#ifdef FW_RECOVERY
 +	ushort fw_recovery = 0;
 +#endif
-+
+ 
 +#define CONFIG_LZMA 1
 +
 +#if 0 /* cu570m big start */
 +/* cu570m end */
- int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- {
- 	ulong	iflag;
+ /*******************************************************************/
+ /* bootm - boot application image from image in memory */
+ /*******************************************************************/
 @@ -228,7 +238,7 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 	len  = ntohl(hdr->ih_size);
+ 	image_print_contents (hdr);
  
  	if (verify) {
 -		puts ("   Verifying Checksum ... ");
-+		printf("   Verifying Checksum at 0x%p ...", data); /* cu570m */
- 		if (crc32 (0, (uchar *)data, len) != ntohl(hdr->ih_dcrc)) {
++		printf("   Verifying Checksum at 0x%p ...", img_addr + sizeof(image_header_t)); /* cu570m */
+ 		if (!image_check_dcrc (hdr)) {
  			printf ("Bad Data CRC\n");
  			show_boot_progress (-3);
 @@ -316,6 +326,19 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
@@ -220,20 +220,20 @@ index 5a8572602c..2f6edbffc9 100644
 +#endif
 +/* cu570m end */
 +
- 	switch (hdr->ih_comp) {
+ 	switch (comp) {
  	case IH_COMP_NONE:
- 		if(ntohl(hdr->ih_load) == addr) {
+ 		if (load_start == (ulong)os_hdr) {
 @@ -341,6 +364,8 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- #endif	/* CONFIG_HW_WATCHDOG || CONFIG_WATCHDOG */
+ 			puts("OK\n");
  		}
  		break;
 +
 +#ifndef COMPRESSED_UBOOT /* cu570m */
  	case IH_COMP_GZIP:
- 		printf ("   Uncompressing %s ... ", name);
- 		if (gunzip ((void *)ntohl(hdr->ih_load), unc_len,
+ 		printf ("   Uncompressing %s ... ", type_name);
+ 		if (gunzip ((void *)load_start, unc_len,
 @@ -368,6 +393,21 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 		}
+ 		load_end = load_start + unc_len;
  		break;
  #endif /* CONFIG_BZIP2 */
 +#endif /* #ifndef COMPRESSED_UBOOT */ /* cu570m */
@@ -255,7 +255,7 @@ index 5a8572602c..2f6edbffc9 100644
  		if (iflag)
  			enable_interrupts();
 @@ -460,6 +500,151 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 	return 1;
+ 	return (void *)img_addr;
  }
  
 +/* cu570m big else */
@@ -404,34 +404,8 @@ index 5a8572602c..2f6edbffc9 100644
 +#endif	/* 0 */ /* cu570m big end */
 +
  U_BOOT_CMD(
-  	bootm,	CFG_MAXARGS,	1,	do_bootm,
-  	"bootm   - boot application image from memory\n",
-@@ -1482,6 +1667,7 @@ print_type (image_header_t *hdr)
- 	case IH_COMP_NONE:	comp = "uncompressed";		break;
- 	case IH_COMP_GZIP:	comp = "gzip compressed";	break;
- 	case IH_COMP_BZIP2:	comp = "bzip2 compressed";	break;
-+	case IH_COMP_LZMA:	comp = "lzma compressed";	break; /* cu570m */
- 	default:		comp = "unknown compression";	break;
- 	}
- 
-@@ -1515,6 +1701,8 @@ static void zfree(void *x, void *addr, unsigned nb)
- 
- #define DEFLATED	8
- 
-+#ifndef COMPRESSED_UBOOT /* cu570m */
-+
- int gunzip(void *dst, int dstlen, unsigned char *src, unsigned long *lenp)
- {
- 	z_stream s;
-@@ -1577,6 +1765,8 @@ void bz_internal_error(int errcode)
- }
- #endif /* CONFIG_BZIP2 */
- 
-+#endif /* #ifndef COMPRESSED_UBOOT */ /* cu570m */
-+
- static void
- do_bootm_rtems (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[],
- 		ulong addr, ulong *len_ptr, int verify)
+ 	bootm,	CFG_MAXARGS,	1,	do_bootm,
+ 	"bootm   - boot application image from memory\n",
 diff --git a/common/cmd_elf.c b/common/cmd_elf.c
 index 2eb7453156..7bfff45012 100644
 --- a/common/cmd_elf.c
@@ -1178,6 +1152,37 @@ index af2f8cbf7b..3839e4a2d6 100644
  
  /*
   * Use puts() instead of printf() to avoid printf buffer overflow
+diff --git a/common/gunzip.c b/common/gunzip.c
+index 74f0bf9f3e..963dd47ce7 100644
+--- a/common/gunzip.c
++++ b/common/gunzip.c
+@@ -57,6 +57,8 @@ void zfree(void *x, void *addr, unsigned nb)
+ 	free (addr);
+ }
+ 
++#ifndef COMPRESSED_UBOOT /* cu570m */
++
+ int gunzip(void *dst, int dstlen, unsigned char *src, unsigned long *lenp)
+ {
+ 	z_stream s;
+@@ -111,3 +113,5 @@ int gunzip(void *dst, int dstlen, unsigned char *src, unsigned long *lenp)
+ 
+ 	return (0);
+ }
++
++#endif /* #ifndef COMPRESSED_UBOOT */ /* cu570m */
+diff --git a/common/image.c b/common/image.c
+index 67e594df69..396c8b20cf 100644
+--- a/common/image.c
++++ b/common/image.c
+@@ -148,6 +148,7 @@ static table_entry_t uimage_comp[] = {
+ 	{	IH_COMP_NONE,	"none",		"uncompressed",		},
+ 	{	IH_COMP_BZIP2,	"bzip2",	"bzip2 compressed",	},
+ 	{	IH_COMP_GZIP,	"gzip",		"gzip compressed",	},
++	{	IH_COMP_LZMA,	"lzma",	"lzma compressed",	},
+ 	{	-1,		"",		"",			},
+ };
+ 
 diff --git a/common/main.c b/common/main.c
 index 21e7afab61..647165c3de 100644
 --- a/common/main.c

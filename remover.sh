@@ -306,6 +306,7 @@ rm -rf ./tools/bddb/
 rm -rf ./tools/easylogo/
 rm -rf ./tools/env/
 rm -rf ./tools/gdb/
+rm -f ./tools/fdt_host.h
 rm -f ./tools/img2brec.sh
 rm -f ./tools/Makefile.win32
 rm -f ./tools/mpc86x_clk.c

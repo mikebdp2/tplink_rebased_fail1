@@ -1,12 +1,12 @@
-From ac474ff9c35a67817fe6d4dc330428b380b40340 Mon Sep 17 00:00:00 2001
+From bde23797b945670c7fafd59ed837921cc5f5eb47 Mon Sep 17 00:00:00 2001
 From: Mike Banon <mikebdp2@gmail.com>
-Date: Tue, 10 Dec 2019 17:09:29 +0000
+Date: Wed, 11 Dec 2019 16:17:53 +0000
 Subject: [PATCH] Modify ./lib_mips/ according to WR841N(D)v9 u-boot
 
 ---
- lib_mips/board.c      | 56 ++++++++++++++++++++++++++++
- lib_mips/mips_linux.c | 86 ++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 141 insertions(+), 1 deletion(-)
+ lib_mips/board.c | 56 ++++++++++++++++++++++++++++++
+ lib_mips/bootm.c | 88 +++++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 143 insertions(+), 1 deletion(-)
 
 diff --git a/lib_mips/board.c b/lib_mips/board.c
 index 1645f2c7e0..deb5f08215 100644
@@ -148,10 +148,10 @@ index 1645f2c7e0..deb5f08215 100644
  	/* main_loop() can return to retry autoboot, if so just run it again. */
  	for (;;) {
  		main_loop ();
-diff --git a/lib_mips/mips_linux.c b/lib_mips/mips_linux.c
-index 556b1804e0..48b3cef942 100644
---- a/lib_mips/mips_linux.c
-+++ b/lib_mips/mips_linux.c
+diff --git a/lib_mips/bootm.c b/lib_mips/bootm.c
+index e4c139efab..0059e7e339 100644
+--- a/lib_mips/bootm.c
++++ b/lib_mips/bootm.c
 @@ -28,6 +28,12 @@
  #include <asm/byteorder.h>
  #include <asm/addrspace.h>
@@ -165,9 +165,9 @@ index 556b1804e0..48b3cef942 100644
  DECLARE_GLOBAL_DATA_PTR;
  
  #define	LINUX_MAX_ENVS		256
-@@ -47,6 +53,20 @@ static int	linux_env_idx;
- static void linux_params_init (ulong start, char * commandline);
- static void linux_env_set (char * env_name, char * env_val);
+@@ -45,12 +51,34 @@ static void linux_env_set (char * env_name, char * env_val);
+ 
+ extern int do_reset (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[]);
  
 +/* cu570m start */
 +#ifdef CONFIG_WASP_SUPPORT
@@ -183,37 +183,39 @@ index 556b1804e0..48b3cef942 100644
 +}
 +#endif
 +/* cu570m end */
- 
++
  void do_bootm_linux (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[],
- 		     ulong addr, ulong * len_ptr, int verify)
-@@ -54,13 +74,25 @@ void do_bootm_linux (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[],
- 	ulong len = 0, checksum;
- 	ulong initrd_start, initrd_end;
- 	ulong data;
+ 		     bootm_headers_t *images)
+ {
+ 	ulong	initrd_start, initrd_end;
+ 	ulong	ep = 0;
 +/* cu570m start */
 +	ulong mem_size_to_kernel;
 +#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
 +	int flash_size_mbytes;
 +	void (*theKernel) (int, char **, char **, int);
 +#else /* old default branch */
- 	void (*theKernel) (int, char **, char **, int *);
+ 	void	(*theKernel) (int, char **, char **, int *);
 +#endif /* cu570m */
- 	image_header_t *hdr = &header;
- 	char *commandline = getenv ("bootargs");
- 	char env_buf[12];
--
+ 	char	*commandline = getenv ("bootargs");
+ 	char	env_buf[12];
+ 	int	ret;
+@@ -71,8 +99,13 @@ void do_bootm_linux (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[],
+ 		puts ("Could not find kernel entry point!\n");
+ 		goto error;
+ 	}
+-	theKernel = (void (*)(int, char **, char **, int *))ep;
+ 
 +/* cu570m condition branch */
 +#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
-+	theKernel =
-+		(void (*)(int, char **, char **, int)) ntohl (hdr->ih_ep);
++	theKernel = (void (*)(int, char **, char **, int))ep;
 +#else /* old default branch */
- 	theKernel =
- 		(void (*)(int, char **, char **, int *)) ntohl (hdr->ih_ep);
++	theKernel = (void (*)(int, char **, char **, int *))ep;
 +#endif /* cu570m */
- 
- 	/*
- 	 * Check if there is an initrd image
-@@ -206,12 +238,29 @@ void do_bootm_linux (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[],
+ 	ret = boot_get_ramdisk (argc, argv, images, IH_ARCH_MIPS,
+ 			&initrd_start, &initrd_end);
+ 	if (ret)
+@@ -119,7 +152,24 @@ void do_bootm_linux (cmd_tbl_t * cmdtp, int flag, int argc, char *argv[],
  	/* we assume that the kernel is in place */
  	printf ("\nStarting kernel ...\n\n");
  
@@ -224,18 +226,21 @@ index 556b1804e0..48b3cef942 100644
 +#endif
 +	/* Pass the flash size as expected by current Linux kernel for AR7100 */
 +	flash_size_mbytes = gd->bd->bi_flashsize/(1024 * 1024);
-+    /* as the same, we pass the Memsize to kernel
-+     * uboot can auto search mem to set memsize,so this memsize is right
-+     * ZJin, 2011.07.18
-+     */
-+    mem_size_to_kernel = gd->ram_size;
++	/* as the same, we pass the Memsize to kernel
++	 * uboot can auto search mem to set memsize,so this memsize is right
++	 * ZJin, 2011.07.18
++	 */
++	mem_size_to_kernel = gd->ram_size;
 +	theKernel (linux_argc, linux_argv, mem_size_to_kernel, flash_size_mbytes);
 +	/* theKernel (linux_argc, linux_argv, linux_env, flash_size_mbytes); */
 +#else /* old default branch */
  	theKernel (linux_argc, linux_argv, linux_env, 0);
 +#endif /* cu570m */
- }
++
+ 	/* does not return */
+ 	return;
  
+@@ -132,6 +182,7 @@ error:
  static void linux_params_init (ulong start, char *line)
  {
  	char *next, *quote, *argp;
@@ -243,7 +248,7 @@ index 556b1804e0..48b3cef942 100644
  
  	linux_argc = 1;
  	linux_argv = (char **) start;
-@@ -220,6 +269,14 @@ static void linux_params_init (ulong start, char *line)
+@@ -140,6 +191,14 @@ static void linux_params_init (ulong start, char *line)
  
  	next = line;
  
@@ -258,7 +263,7 @@ index 556b1804e0..48b3cef942 100644
  	while (line && *line && linux_argc < LINUX_MAX_ARGS) {
  		quote = strchr (line, '"');
  		next = strchr (line, ' ');
-@@ -242,6 +299,20 @@ static void linux_params_init (ulong start, char *line)
+@@ -162,6 +221,20 @@ static void linux_params_init (ulong start, char *line)
  		linux_argv[linux_argc] = argp;
  		memcpy (argp, line, next - line);
  		argp[next - line] = 0;
@@ -279,7 +284,7 @@ index 556b1804e0..48b3cef942 100644
  
  		argp += next - line + 1;
  		linux_argc++;
-@@ -252,6 +323,19 @@ static void linux_params_init (ulong start, char *line)
+@@ -172,6 +245,19 @@ static void linux_params_init (ulong start, char *line)
  		line = next;
  	}
  
