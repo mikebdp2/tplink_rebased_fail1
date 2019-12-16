@@ -162,7 +162,7 @@ index e68f16f9da..d843c6df22 100644
  
  U_BOOT_CMD(
 diff --git a/common/cmd_bootm.c b/common/cmd_bootm.c
-index 5a8572602c..2f6edbffc9 100644
+index 5a8572602c..3edc32d2df 100644
 --- a/common/cmd_bootm.c
 +++ b/common/cmd_bootm.c
 @@ -31,6 +31,7 @@
@@ -173,7 +173,7 @@ index 5a8572602c..2f6edbffc9 100644
  #include <environment.h>
  #include <lmb.h>
  #include <asm/byteorder.h>
-@@ -148,7 +149,15 @@ image_header_t header;
+@@ -148,6 +149,55 @@ image_header_t header;
  }
  void board_lmb_reserve(struct lmb *lmb) __attribute__((weak, alias("__board_lmb_reserve")));
  
@@ -181,85 +181,13 @@ index 5a8572602c..2f6edbffc9 100644
 +#ifdef FW_RECOVERY
 +	ushort fw_recovery = 0;
 +#endif
- 
++
 +#define CONFIG_LZMA 1
-+
-+#if 0 /* cu570m big start */
-+/* cu570m end */
- /*******************************************************************/
- /* bootm - boot application image from image in memory */
- /*******************************************************************/
-@@ -228,7 +238,7 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 	image_print_contents (hdr);
- 
- 	if (verify) {
--		puts ("   Verifying Checksum ... ");
-+		printf("   Verifying Checksum at 0x%p ...", img_addr + sizeof(image_header_t)); /* cu570m */
- 		if (!image_check_dcrc (hdr)) {
- 			printf ("Bad Data CRC\n");
- 			show_boot_progress (-3);
-@@ -316,6 +326,19 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 	dcache_disable();
- #endif
- 
-+/* cu570m start */
-+#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
-+	/*
-+	 * Flush everything, restore caches for linux
-+	 */
-+	mips_cache_flush();
-+	mips_icache_flush_ix();
-+
-+	/* XXX - this causes problems when booting from flash */
-+	/* dcache_disable(); */
-+#endif
-+/* cu570m end */
-+
- 	switch (comp) {
- 	case IH_COMP_NONE:
- 		if (load_start == (ulong)os_hdr) {
-@@ -341,6 +364,8 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 			puts("OK\n");
- 		}
- 		break;
-+
-+#ifndef COMPRESSED_UBOOT /* cu570m */
- 	case IH_COMP_GZIP:
- 		printf ("   Uncompressing %s ... ", type_name);
- 		if (gunzip ((void *)load_start, unc_len,
-@@ -368,6 +393,21 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 		load_end = load_start + unc_len;
- 		break;
- #endif /* CONFIG_BZIP2 */
-+#endif /* #ifndef COMPRESSED_UBOOT */ /* cu570m */
-+
-+#ifdef CONFIG_LZMA /* cu570m start */
-+	case IH_COMP_LZMA:
-+		printf ("   Uncompressing %s ... ", name);
-+		i = lzma_inflate ((unsigned char *)data, len, (unsigned char*)ntohl(hdr->ih_load), &unc_len);
-+		if (i != LZMA_RESULT_OK) {
-+			printf ("LZMA ERROR %d - must RESET board to recover\n", i);
-+			show_boot_progress (-6);
-+			udelay(100000);
-+			do_reset (cmdtp, flag, argc, argv);
-+		}
-+		break;
-+#endif /* CONFIG_LZMA */ /* cu570m end */
-+
- 	default:
- 		if (iflag)
- 			enable_interrupts();
-@@ -460,6 +500,151 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
- 	return (void *)img_addr;
- }
- 
-+/* cu570m big else */
-+#else
 +
 +/* changed by lqm, 18Jan08 */
 +#include "tpLinuxTag.h"		/* support TP-LINK Linux Tag */
 +
-+// TODO: ??? MACRO ???
++// TODO: pass these values via an external MACRO /* cu570m */
 +LINUX_FLASH_STRUCT linuxFlash =
 +						{
 +							0x000000,	/* boot loader 	*/
@@ -286,7 +214,7 @@ index 5a8572602c..2f6edbffc9 100644
 +	hdr->ih_ep    = htonl(entryPoint);
 +	hdr->ih_dcrc  = htonl(checksum);
 +	hdr->ih_os    = IH_OS_LINUX;
-+	hdr->ih_arch  = IH_CPU_MIPS;
++	hdr->ih_arch  = IH_ARCH_MIPS;
 +	hdr->ih_type  = IH_TYPE_KERNEL;
 +	hdr->ih_comp  = IH_COMP_GZIP;
 +
@@ -296,65 +224,34 @@ index 5a8572602c..2f6edbffc9 100644
 +
 +	return hdr;
 +}
++/* cu570m end */
 +
-+int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
-+{
-+	ulong	iflag;
-+	ulong	addr;
-+	ulong	data, len, checksum;
-+	ulong	kernelTextAddr, kernelEntryPoint, kernelLen;
-+	ulong  *len_ptr;
-+	uint	unc_len = CFG_BOOTM_LEN;
-+	int	i, verify = 0;
-+	char	*name, *s;
-+	int	(*appl)(int, char *[]);
-+	image_header_t *hdr = &header;
-+
-+	if (argc < 2) {
-+		addr = load_addr;
-+	} else {
-+		addr = simple_strtoul(argv[1], NULL, 16);
-+	}
-+
-+	show_boot_progress (1);
-+	printf ("## Booting image at %08lx ...\n", addr);
-+
-+    name = (char *) addr;
-+
-+	kernelTextAddr = *(ulong *)(name+116);
-+	kernelEntryPoint = *(ulong *)(name+120);
-+	kernelLen = *(ulong *)(name+132);
-+
-+	fake_image_header(hdr, kernelTextAddr, kernelEntryPoint, kernelLen);
-+
-+	data = addr + 512;
-+	len  = ntohl(hdr->ih_size);
-+
-+	/* TODO ??? fileTag ??? magic number ??? checksum */
-+	show_boot_progress (2);
-+
-+	name = "Kernel Image";
-+	show_boot_progress (6);
-+
-+	/*
-+	 * We have reached the point of no return: we are going to
-+	 * overwrite all exception vector code, so we cannot easily
-+	 * recover from any failures any more...
-+	 */
-+
-+	iflag = disable_interrupts();
-+
-+#ifdef CONFIG_AMIGAONEG3SE
-+	/*
-+	 * We've possible left the caches enabled during
-+	 * bios emulation, so turn them off again
-+	 */
-+	icache_disable();
-+	invalidate_l1_instruction_cache();
-+	flush_data_cache();
-+	dcache_disable();
-+#endif
-+
+ 
+ /*******************************************************************/
+ /* bootm - boot application image from image in memory */
+@@ -160,12 +210,15 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+ 	ulong		image_start, image_end;
+ 	ulong		load_start, load_end;
+ 	ulong		mem_start, mem_size;
++	ulong	kernelTextAddr, kernelEntryPoint, kernelLen;	/* cu570m addition */
+ 
+ 	struct lmb lmb;
+ 
+ 	memset ((void *)&images, 0, sizeof (images));
+-	images.verify = getenv_yesno ("verify");
++	// images.verify = getenv_yesno ("verify");		/* cu570m removal */
++	images.verify = 0;					/* cu570m addition */
+-	images.autostart = getenv_yesno ("autostart");
++	// images.autostart = getenv_yesno ("autostart");	/* cu570m removal */
++	images.autostart = 0;					/* cu570m addition */
+ 	images.lmb = &lmb;
+ 
+ 	lmb_init(&lmb);
+@@ -316,6 +391,21 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+ 	dcache_disable();
+ #endif
+ 
++/* cu570m start */
 +#if defined(CONFIG_AR7100) || defined(CONFIG_AR7240) || defined(CONFIG_ATHEROS)
 +	/*
 +	 * Flush everything, restore caches for linux
@@ -365,42 +262,87 @@ index 5a8572602c..2f6edbffc9 100644
 +	/* XXX - this causes problems when booting from flash */
 +	/* dcache_disable(); */
 +#endif
++/* cu570m end */
 +
-+#ifdef CONFIG_LZMA
-+/*	case IH_COMP_LZMA:*/
-+		printf ("   Uncompressing %s ... ", name);
-+		i = lzma_inflate ((unsigned char *)data, len, (unsigned char*)ntohl(hdr->ih_load), &unc_len);
++/* cu570m big removal 3 - start */
++#if 0
+ 	switch (comp) {
+ 	case IH_COMP_NONE:
+ 		if (load_start == (ulong)os_hdr) {
+@@ -341,6 +431,8 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+ 			puts("OK\n");
+ 		}
+ 		break;
++
++#ifndef COMPRESSED_UBOOT /* cu570m */
+ 	case IH_COMP_GZIP:
+ 		printf ("   Uncompressing %s ... ", type_name);
+ 		if (gunzip ((void *)load_start, unc_len,
+@@ -368,6 +460,24 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+ 		load_end = load_start + unc_len;
+ 		break;
+ #endif /* CONFIG_BZIP2 */
++#endif /* #ifndef COMPRESSED_UBOOT */ /* cu570m */
++#endif /* cu570m big removal 3 - end */
++
++#ifdef CONFIG_LZMA /* cu570m start */
++	// case IH_COMP_LZMA: /* cu570m removal */
++		printf ("   Uncompressing %s ... ", type_name);
++		int i = lzma_inflate ((unsigned char *)os_data, os_len, (unsigned char*)load_start, &unc_len);
 +		if (i != LZMA_RESULT_OK) {
 +			printf ("LZMA ERROR %d - must RESET board to recover\n", i);
 +			show_boot_progress (-6);
-+			//udelay(100000);
++			// udelay(100000); /* cu570m removal */
 +			do_reset (cmdtp, flag, argc, argv);
 +		}
-+/*		break;*/
-+#endif /* CONFIG_LZMA */
-+	puts ("OK\n");
-+	show_boot_progress (7);
++		// break; /* cu570m removal */
++#endif /* CONFIG_LZMA */ /* cu570m end */
 +
-+/*	case IH_OS_LINUX: */
-+#ifdef CONFIG_SILENT_CONSOLE
-+	    fixup_silent_linux();
++/* cu570m big removal 4 - start */
++#if 0
+ 	default:
+ 		if (iflag)
+ 			enable_interrupts();
+@@ -375,10 +485,15 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+ 		show_boot_progress (-7);
+ 		return 1;
+ 	}
 +#endif
-+	    do_bootm_linux  (cmdtp, flag, argc, argv,
-+			     addr, len_ptr, verify);
++/* cu570m big removal 4 - end */
 +
-+	show_boot_progress (-9);
-+#ifdef DEBUG
-+	puts ("\n## Control returned to monitor - resetting...\n");
-+	do_reset (cmdtp, flag, argc, argv);
-+#endif
-+	return 1;
-+}
+ 	puts ("OK\n");
+ 	debug ("   kernel loaded at 0x%08lx, end = 0x%08lx\n", load_start, load_end);
+ 	show_boot_progress (7);
+ 
++/* cu570m big removal 5 - start */
++#if 0
+ 	if ((load_start < image_end) && (load_end > image_start)) {
+ 		debug ("image_start = 0x%lX, image_end = 0x%lx\n", image_start, image_end);
+ 		debug ("load_start = 0x%lx, load_end = 0x%lx\n", load_start, load_end);
+@@ -411,10 +526,15 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+ 	switch (os) {
+ 	default:			/* handled by (original) Linux case */
+ 	case IH_OS_LINUX:
++#endif /* cu570m big removal 5 - end */
 +
-+#endif	/* 0 */ /* cu570m big end */
+ #ifdef CONFIG_SILENT_CONSOLE
+ 	    fixup_silent_linux();
+ #endif
+ 	    do_bootm_linux (cmdtp, flag, argc, argv, &images);
 +
- U_BOOT_CMD(
- 	bootm,	CFG_MAXARGS,	1,	do_bootm,
- 	"bootm   - boot application image from memory\n",
++/* cu570m big removal 6 - start */
++#if 0
+ 	    break;
+ 
+ 	case IH_OS_NETBSD:
+@@ -451,6 +571,7 @@ int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+ 	    break;
+ #endif
+ 	}
++#endif /* cu570m big removal 6 - end */
+ 
+ 	show_boot_progress (-9);
+ #ifdef DEBUG
 diff --git a/common/cmd_elf.c b/common/cmd_elf.c
 index 2eb7453156..7bfff45012 100644
 --- a/common/cmd_elf.c
