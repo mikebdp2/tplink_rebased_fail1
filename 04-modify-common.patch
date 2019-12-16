@@ -22,7 +22,7 @@ diff --git a/common/Makefile b/common/Makefile
 index 56176ca2af..c8f3a959fb 100644
 --- a/common/Makefile
 +++ b/common/Makefile
-@@ -27,6 +27,49 @@ LIB	= $(obj)libcommon.a
+@@ -27,6 +27,50 @@ LIB	= $(obj)libcommon.a
  
  AOBJS	=
  
@@ -61,6 +61,7 @@ index 56176ca2af..c8f3a959fb 100644
 +COBJS-y += env_nowhere.o
 +COBJS-y += exports.o
 +COBJS-y += hush.o
++COBJS-y += image.o
 +COBJS-y += lcd.o
 +COBJS-y += lists.o
 +COBJS-y += memsize.o

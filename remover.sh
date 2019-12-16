@@ -11,6 +11,7 @@ rm -f ./common/ACEX1K.c
 rm -f ./common/altera.c
 rm -f ./common/bedbug.c
 rm -f ./common/cmd_ace.c
+rm -f ./common/cmd_ambapp.c
 rm -f ./common/cmd_autoscript.c
 rm -f ./common/cmd_bdinfo.c
 rm -f ./common/cmd_bedbug.c
@@ -32,6 +33,7 @@ rm -f ./common/cmd_log.c
 rm -f ./common/cmd_mac.c
 rm -f ./common/cmd_mfsl.c
 rm -f ./common/cmd_mmc.c
+rm -f ./common/cmd_mp.c
 rm -f ./common/cmd_onenand.c
 rm -f ./common/cmd_otp.c
 rm -f ./common/cmd_pci.c
@@ -65,6 +67,7 @@ rm -f ./common/soft_i2c.c
 rm -f ./common/soft_spi.c
 rm -f ./common/spartan2.c
 rm -f ./common/spartan3.c
+rm -f ./common/stratixII.c
 rm -f ./common/usb.c
 rm -f ./common/usb_kbd.c
 rm -f ./common/usb_storage.c
@@ -115,6 +118,9 @@ mv ./drivers_rtc/ ./drivers/rtc/
 rm -f ./drivers/pci/fsl_pci_init.c
 rm -f ./drivers/pci/pci_auto.c
 rm -f ./drivers/pci/pci_indirect.c
+rm -f ./drivers/pci/pci_sh4.c
+rm -f ./drivers/pci/pci_sh7751.c
+rm -f ./drivers/pci/pci_sh7780.c
 rm -f ./drivers/pci/tsi108_pci.c
 rm -f ./drivers/pci/w83c553f.c
 rm -rf ./dtt/
@@ -129,6 +135,7 @@ rm -f ./include/74xx_7xx.h
 rm -f ./include/ACEX1K.h
 rm -f ./include/ahci.h
 rm -f ./include/altera.h
+rm -f ./include/ambapp.h
 rm -f ./include/api_public.h
 rm -f ./include/arm920t.h
 rm -f ./include/arm925t.h
@@ -163,8 +170,7 @@ rm -f ./include/elf.h
 rm -f ./include/ext2fs.h
 rm -f ./include/fat.h
 rm -f ./include/fdc.h
-rm -f ./include/fdt.h
-rm -f ./include/fdt_support.h
+rm -f ./include/fis.h
 rm -f ./include/fpga.h
 rm -f ./include/ft_build.h
 rm -rf ./include/galileo/
@@ -179,8 +185,7 @@ rm -f ./include/led.h
 rm -f ./include/lh7a400.h
 rm -f ./include/lh7a404.h
 rm -f ./include/lh7a40x.h
-rm -f ./include/libfdt.h
-rm -f ./include/libfdt_env.h
+rm -f ./include/libata.h
 rm -f ./include/linux/byteorder/little_endian.h
 rm -f ./include/linux/mc146818rtc.h
 rm -rf ./include/linux/mtd/
@@ -253,6 +258,7 @@ rm -f ./include/spartan3.h
 rm -f ./include/spd.h
 rm -f ./include/spd_sdram.h
 rm -f ./include/status_led.h
+rm -f ./include/stratixII.h
 rm -f ./include/sym53c8xx.h
 rm -f ./include/systemace.h
 rm -f ./include/tsi108.h
@@ -265,6 +271,7 @@ rm -f ./include/usbdcore_ep0.h
 rm -f ./include/usbdcore_mpc8xx.h
 rm -f ./include/usbdcore_omap1510.h
 rm -f ./include/usbdescriptors.h
+rm -f ./include/vsc7385.h
 rm -f ./include/vfd_logo.h
 rm -f ./include/video.h
 rm -f ./include/video_ad7176.h
@@ -296,7 +303,6 @@ rm -f ./lib_generic/bzlib_private.h
 rm -f ./lib_generic/bzlib_randtable.c
 rm -f ./lib_generic/div64.c
 rm -f ./lib_generic/zlib.c
-rm -rf ./libfdt/
 rm -rf ./nand_spl/
 rm -f ./net/sntp.c
 rm -f ./net/sntp.h
@@ -306,7 +312,6 @@ rm -rf ./tools/bddb/
 rm -rf ./tools/easylogo/
 rm -rf ./tools/env/
 rm -rf ./tools/gdb/
-rm -f ./tools/fdt_host.h
 rm -f ./tools/img2brec.sh
 rm -f ./tools/Makefile.win32
 rm -f ./tools/mpc86x_clk.c
